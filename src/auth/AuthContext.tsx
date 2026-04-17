@@ -1,9 +1,14 @@
 import { createContext, useContext } from 'react'
-import type { AuthState, LoginCredentials } from '@/types/auth'
+import type { AuthStatus, AuthUser, AuthenticatedFetch, LoginCredentials } from '@/types/auth'
 
-interface AuthContextValue extends AuthState {
+interface AuthContextValue {
+  status: AuthStatus
+  user: AuthUser | null
+  error: string | null
+  isAuthenticated: boolean
+  authenticatedFetch: AuthenticatedFetch
   login: (credentials: LoginCredentials) => Promise<void>
-  logout: () => void
+  logout: () => Promise<void>
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null)

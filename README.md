@@ -29,18 +29,21 @@ Create a `.env.local` file (gitignored):
 VITE_API_BASE_URL=http://your-backend-server:8000
 ```
 
-The dev server runs on `http://localhost:5173`. Your FastAPI backend must allow that origin during development via `CORSMiddleware`:
+The dev server runs on `http://localhost:5173`. Your FastAPI backend must allow that origin with credentials support via `CORSMiddleware`:
 
 ```python
 from fastapi.middleware.cors import CORSMiddleware
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
-    allow_methods=["POST"],
+    allow_origins=["http://localhost:5173"],  # add production internal URL here
+    allow_methods=["GET", "POST"],
     allow_headers=["Authorization", "Content-Type"],
+    allow_credentials=True,   # required — frontend uses credentials: "include"
 )
 ```
+
+`allow_credentials=True` is required because this frontend sends `credentials: "include"` on every request so the browser transmits the httpOnly session cookie. This also means `allow_origins` must be an explicit list — `"*"` is not permitted by browsers when credentials are involved.
 
 In production, CORS is not needed if the frontend and backend are served from the same origin (e.g. behind the same nginx reverse proxy).
 
@@ -49,50 +52,66 @@ In production, CORS is not needed if the frontend and backend are served from th
 ```
 src/
   api/
-    auth.ts           # POST /auth/login (unauthenticated)
-    client.ts         # apiFetch — attaches Bearer token, handles 401
+    auth.ts           # login, refresh, logout API calls
+    client.ts         # createAuthorizedFetch — Bearer token + 401 retry with refresh
   auth/
-    tokenStorage.ts   # single point of control for token read/write/clear
-    authReducer.ts    # auth state machine
+    authReducer.ts    # auth state machine (loading / authenticated / unauthenticated)
     AuthContext.tsx   # AuthContext + useAuth() hook
-    AuthProvider.tsx  # context provider
+    AuthProvider.tsx  # context provider — bootstrap, token refresh, authenticatedFetch
     PrivateRoute.tsx  # redirects unauthenticated users to /login
   pages/
     LoginPage.tsx     # login form
     Dashboard.tsx     # placeholder protected page
   types/
     auth.ts           # shared TypeScript types
+  config.ts           # API base URL + endpoint path constants
   App.tsx             # router + route definitions
 ```
 
 ## Auth Flow
 
-1. User submits username + password on `/login`
-2. Frontend calls `POST {VITE_API_BASE_URL}/auth/login` with `{ username, password }`
-3. Backend validates against AD and returns `{ access_token, token_type: "bearer" }`
-4. Token is stored in memory (primary) and `sessionStorage` (restored on page refresh)
-5. All subsequent API calls via `apiFetch` include `Authorization: Bearer <token>`
-6. Any `401` response clears the token and redirects to `/login`
-7. Logging out clears the token from memory and `sessionStorage`
+1. **Bootstrap** — on every page load, `AuthProvider` calls `POST /auth/refresh`. If the server returns a valid session (via httpOnly cookie), the access token is stored in memory and the user is shown their page. If not, they are redirected to `/login`.
+2. **Login** — user submits credentials → `POST /auth/login` → server validates against AD, sets an httpOnly session cookie, and returns `{ access_token, user }` in the response body.
+3. **API calls** — use `authenticatedFetch` from `useAuth()`. It attaches `Authorization: Bearer <token>` and sends `credentials: "include"` so the session cookie rides along.
+4. **Token refresh** — if any API call returns `401`, `authenticatedFetch` automatically calls `POST /auth/refresh`, retries the request once with the new token, and falls back to logout if the refresh also fails. Concurrent refresh requests are deduplicated.
+5. **Logout** — calls `POST /auth/logout` to clear the server-side session cookie, then clears all local auth state.
 
 ## Backend Contract
 
-The FastAPI backend must expose:
+The FastAPI backend must expose three endpoints:
 
 ```
 POST /auth/login
-Content-Type: application/json
+  Body:     { "username": "string", "password": "string" }
+  Response: 200 { "access_token": "...", "token_type": "bearer", "user": { ... } }
+  Cookie:   Set-Cookie: session=...; HttpOnly; SameSite=Strict; Secure; Path=/
 
-{ "username": "string", "password": "string" }
+POST /auth/refresh
+  Cookie:   session cookie (sent automatically by browser)
+  Response: 200 { "access_token": "...", "token_type": "bearer", "user": { ... } }
+            401 if cookie is missing or expired
 
-→ 200 { "access_token": "string", "token_type": "bearer" }
-→ 401 on invalid credentials
+POST /auth/logout
+  Cookie:   session cookie (sent automatically by browser)
+  Response: 204 No Content
+  Cookie:   clears the session cookie
 ```
 
-Recommended backend settings for security:
-- Set a short JWT expiry (15–60 minutes)
-- Enforce HTTPS at the reverse proxy (nginx/IIS)
-- Restrict CORS to your internal origins only
+The `user` object shape:
+```json
+{
+  "id": "string",
+  "username": "string",
+  "displayName": "string (optional)",
+  "roles": ["string"]
+}
+```
+
+Recommended backend settings:
+- Short access token expiry (15–60 minutes) — the refresh flow handles silent renewal
+- `SameSite=Strict` on the session cookie — prevents CSRF
+- `Secure` on the session cookie — requires HTTPS (enforce at nginx/IIS level)
+- Restrict CORS `allow_origins` to your actual internal origins
 
 ## Adding Protected Pages
 
@@ -107,13 +126,15 @@ Nest new routes under `<PrivateRoute />` in [`src/App.tsx`](src/App.tsx):
 
 ## Making Authenticated API Calls
 
-Use `apiFetch` from `src/api/client.ts` — it automatically attaches the Bearer token and redirects to `/login` on `401`:
+Get `authenticatedFetch` from `useAuth()` — it attaches the Bearer token, sends the session cookie, and handles token refresh on 401 transparently:
 
 ```ts
-import { apiFetch } from '@/api/client'
+const { authenticatedFetch } = useAuth()
 
-const data = await apiFetch<MyResponseType>('/some/endpoint')
-const result = await apiFetch<MyResponseType>('/resource', {
+const res = await authenticatedFetch('/some/endpoint')
+const data = await res.json()
+
+const res2 = await authenticatedFetch('/resource', {
   method: 'POST',
   body: JSON.stringify(payload),
 })
@@ -121,18 +142,19 @@ const result = await apiFetch<MyResponseType>('/resource', {
 
 ## Token Storage
 
-Tokens are held in a module-level variable (in-memory) and mirrored to `sessionStorage` so sessions survive page refreshes. `sessionStorage` is tab-scoped and clears when the browser tab is closed.
-
-To upgrade to `httpOnly` cookies (the most secure option) once your backend supports `Set-Cookie`, the only file to change is [`src/auth/tokenStorage.ts`](src/auth/tokenStorage.ts).
+- **Session cookie** (httpOnly) — managed entirely by the server. Set on login, cleared on logout. The browser sends it automatically; JS cannot read it. This is what keeps the user's session alive across page refreshes.
+- **Access token** (in-memory only) — returned by `/auth/login` and `/auth/refresh`, stored in a `useRef` inside `AuthProvider`. Never written to `localStorage` or `sessionStorage`. Lost on page refresh — recovered via the bootstrap refresh call.
 
 ## Security Notes
 
 This architecture is appropriate for internal network apps that are not exposed to the internet. Key points:
 
+- The httpOnly session cookie is inaccessible to JS — XSS cannot steal it
+- The in-memory access token is short-lived; if stolen via XSS, it cannot be refreshed without the cookie
+- CSRF is mitigated by `SameSite=Strict` on the session cookie (set server-side)
 - React's JSX escaping prevents XSS from rendered content — never use `dangerouslySetInnerHTML`
-- CSRF is not a concern with Bearer tokens in headers (only relevant for cookie-based auth)
 - Error messages are always generic ("Invalid credentials.") — API errors are never surfaced to the UI
-- HTTPS **must** be enforced at the infrastructure level (reverse proxy)
+- HTTPS **must** be enforced at the infrastructure level (reverse proxy); set `Secure` on the session cookie
 
 ## Scripts
 

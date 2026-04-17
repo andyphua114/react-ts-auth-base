@@ -1,13 +1,16 @@
 import { useAuth } from '@/auth/AuthContext'
 
 export function Dashboard() {
-  const { logout } = useAuth()
+  const { user, logout } = useAuth()
 
   return (
     <div className="dashboard">
       <header>
         <h1>Dashboard</h1>
-        <button onClick={logout}>Sign Out</button>
+        <div className="dashboard-user">
+          <span>{user?.displayName ?? user?.username}</span>
+          <button onClick={logout}>Sign Out</button>
+        </div>
       </header>
       <main>
         <p>You are authenticated. Add your app content here.</p>

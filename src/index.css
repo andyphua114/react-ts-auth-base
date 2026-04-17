@@ -103,6 +103,14 @@ button[type="submit"]:disabled {
   margin-bottom: 1.5rem;
 }
 
+.dashboard-user {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+  color: #374151;
+}
+
 .dashboard header h1 {
   font-size: 1.25rem;
   font-weight: 600;
