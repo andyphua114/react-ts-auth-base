@@ -65,21 +65,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    refreshSession()
-      .then(({ access_token, user }) => {
-        if (cancelled) return;
-        tokenRef.current = access_token;
-        dispatch({ type: "BOOTSTRAP_SUCCESS", payload: { user } });
-      })
-      .catch(() => {
-        if (cancelled) return;
-        dispatch({ type: "BOOTSTRAP_FAILURE" });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    refreshAccessToken();
+  }, [refreshAccessToken]);
 
   return (
     <AuthContext.Provider
