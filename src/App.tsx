@@ -1,8 +1,8 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
-import { AuthProvider } from '@/auth/AuthProvider'
-import { PrivateRoute } from '@/auth/PrivateRoute'
-import { LoginPage } from '@/pages/LoginPage'
-import { Dashboard } from '@/pages/Dashboard'
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { AuthProvider } from "@/auth/AuthProvider";
+import { PrivateRoute } from "@/auth/PrivateRoute";
+import { LoginPage } from "@/pages/LoginPage";
+import { Dashboard } from "@/pages/Dashboard";
 
 function App() {
   return (
@@ -17,7 +17,7 @@ function App() {
         </Routes>
       </AuthProvider>
     </BrowserRouter>
-  )
+  );
 }
 
-export default App
+export default App;

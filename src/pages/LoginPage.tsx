@@ -1,29 +1,31 @@
-import { useState, useEffect } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
-import { useAuth } from '@/auth/AuthContext'
+import { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "@/auth/AuthContext";
 
 export function LoginPage() {
-  const { login, status, error } = useAuth()
-  const navigate = useNavigate()
-  const location = useLocation()
-  const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname ?? '/'
+  const { login, status, error } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const from =
+    (location.state as { from?: { pathname: string } } | null)?.from
+      ?.pathname ?? "/";
 
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
 
   useEffect(() => {
-    if (status === 'authenticated') {
-      navigate(from, { replace: true })
+    if (status === "authenticated") {
+      navigate(from, { replace: true });
     }
-  }, [status, from, navigate])
+  }, [status, from, navigate]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    if (!username.trim() || !password.trim()) return
-    await login({ username: username.trim(), password })
-  }
+    e.preventDefault();
+    if (!username.trim() || !password.trim()) return;
+    await login({ username: username.trim(), password });
+  };
 
-  const isLoading = status === 'loading'
+  const isLoading = status === "loading";
 
   return (
     <div className="login-wrapper">
@@ -59,9 +61,9 @@ export function LoginPage() {
           </p>
         )}
         <button type="submit" disabled={isLoading}>
-          {isLoading ? 'Signing in…' : 'Sign In'}
+          {isLoading ? "Signing in…" : "Sign In"}
         </button>
       </form>
     </div>
-  )
+  );
 }

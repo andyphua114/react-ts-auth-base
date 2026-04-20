@@ -98,6 +98,7 @@ POST /auth/logout
 ```
 
 The `user` object shape:
+
 ```json
 {
   "id": "string",
@@ -108,6 +109,7 @@ The `user` object shape:
 ```
 
 Recommended backend settings:
+
 - Short access token expiry (15–60 minutes) — the refresh flow handles silent renewal
 - `SameSite=Strict` on the session cookie — prevents CSRF
 - `Secure` on the session cookie — requires HTTPS (enforce at nginx/IIS level)
@@ -120,7 +122,7 @@ Nest new routes under `<PrivateRoute />` in [`src/App.tsx`](src/App.tsx):
 ```tsx
 <Route element={<PrivateRoute />}>
   <Route path="/" element={<Dashboard />} />
-  <Route path="/settings" element={<Settings />} />  {/* add here */}
+  <Route path="/settings" element={<Settings />} /> {/* add here */}
 </Route>
 ```
 
@@ -129,15 +131,15 @@ Nest new routes under `<PrivateRoute />` in [`src/App.tsx`](src/App.tsx):
 Get `authenticatedFetch` from `useAuth()` — it attaches the Bearer token, sends the session cookie, and handles token refresh on 401 transparently:
 
 ```ts
-const { authenticatedFetch } = useAuth()
+const { authenticatedFetch } = useAuth();
 
-const res = await authenticatedFetch('/some/endpoint')
-const data = await res.json()
+const res = await authenticatedFetch("/some/endpoint");
+const data = await res.json();
 
-const res2 = await authenticatedFetch('/resource', {
-  method: 'POST',
+const res2 = await authenticatedFetch("/resource", {
+  method: "POST",
   body: JSON.stringify(payload),
-})
+});
 ```
 
 ## Token Storage
@@ -158,9 +160,9 @@ This architecture is appropriate for internal network apps that are not exposed 
 
 ## Scripts
 
-| Command | Description |
-|---|---|
-| `npm run dev` | Start dev server at http://localhost:5173 |
-| `npm run build` | Type-check and build for production |
-| `npm run preview` | Preview the production build locally |
-| `npm run lint` | Run ESLint across all source files |
+| Command           | Description                               |
+| ----------------- | ----------------------------------------- |
+| `npm run dev`     | Start dev server at http://localhost:5173 |
+| `npm run build`   | Type-check and build for production       |
+| `npm run preview` | Preview the production build locally      |
+| `npm run lint`    | Run ESLint across all source files        |

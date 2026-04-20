@@ -1,7 +1,7 @@
-import { useAuth } from '@/auth/AuthContext'
+import { useAuth } from "@/auth/AuthContext";
 
 export function Dashboard() {
-  const { user, logout } = useAuth()
+  const { user, logout } = useAuth();
 
   return (
     <div className="dashboard">
@@ -16,5 +16,5 @@ export function Dashboard() {
         <p>You are authenticated. Add your app content here.</p>
       </main>
     </div>
-  )
+  );
 }
